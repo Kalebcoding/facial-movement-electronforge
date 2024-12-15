@@ -48,6 +48,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.20",
     "electron-squirrel-startup": "^1.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
