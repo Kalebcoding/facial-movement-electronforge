@@ -1,8 +1,14 @@
 import React, { FC, useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { FaceDetector, FilesetResolver, Detection, FaceLandmarker } from '@mediapipe/tasks-vision';
-import { ConfidenceScore } from '../face-detection/confidence-score';
-import { createPortal } from 'react-dom';
+import { FilesetResolver, FaceLandmarker } from '@mediapipe/tasks-vision';
+
+
+
+const StyledVideo = styled.video`
+    transform: rotateY(180deg);
+    -webkit-transform: rotateY(180deg);
+    -moz-transform: rotateY(180deg);
+`
 
 type Props = {
     mirror?: boolean;
@@ -12,23 +18,15 @@ export const WebcamComponent: FC<Props> = ({ mirror = true }) => {
     const [stream, setStream] = useState(null);
     const [faceLandmarker, setFaceLandmaker] = useState<FaceLandmarker>(null);
     const videoRef = useRef(null);
+    const audioRef = useRef(null);
     const liveView = useRef(null);
-    const children = useRef([]);
 
-
-
-    const StyledVideo = mirror ? styled.video`
-        transform: rotateY(180deg);
-        -webkit-transform:rotateY(180deg); /* Safari and Chrome */
-        -moz-transform:rotateY(180deg); /* Firefox */
-    ` : styled.video``; 
 
     useEffect(() => {
         const getMediaStream = async () => {
             try {
                 const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 setStream(mediaStream);
-                console.log(`set mediaStream`);
             } catch (error) {
                 console.error('Error Accessing webcam:', error);
             }
@@ -51,13 +49,11 @@ export const WebcamComponent: FC<Props> = ({ mirror = true }) => {
 
             setFaceLandmaker(result)
         }
-
         initFaceLandmarker();
         getMediaStream();
     }, [])
 
     useEffect(() => {
-        console.log(`!!stream`, !!stream);
         if (stream) {
             videoRef.current.srcObject = stream;
             videoRef.current.addEventListener("loadeddata", trackFace)
@@ -67,41 +63,33 @@ export const WebcamComponent: FC<Props> = ({ mirror = true }) => {
     const trackFace = async () => {
         let lastVideoTime = -1;
         let startTimeMs = performance.now();
-        if(videoRef.current.currentTime != lastVideoTime) {
-            lastVideoTime = videoRef.current.currentTime; 
+        if (videoRef.current.currentTime != lastVideoTime) {
+            lastVideoTime = videoRef.current.currentTime;
             const detections = faceLandmarker.detectForVideo(videoRef.current, startTimeMs);
-            console.log(`detections Object`, detections?.faceBlendshapes[0]?.categories[25])
-            // displayVideoDetections(detections);
+            const jawOpenVal = detections?.faceBlendshapes[0]?.categories[25].score * 100;
+            if(jawOpenVal > 50 && audioRef.current.paused){
+                audioRef.current.play();
+            }
+
+            if(jawOpenVal < 50 && !audioRef.current.paused){
+                audioRef.current.pause();
+            }
         }
 
-        // Can check here to make sure the webcam is stil running to not spam the browser
         window.requestAnimationFrame(trackFace);
     }
 
-    // This Function could be used to track or draw images ontop of the face 
-    function displayVideoDetections(detections: Detection[]) {
-        // Remove any highlighting from previous frame.
-      
-        console.log(`detections`, detections);
-        for (let child of children.current) {
-          liveView.current.removeChild(child);
-        }
-        children.current.splice(0);
-
-        for (let detection of detections) {
-            const confidenceScore = String(Math.round(parseFloat(String(detection.categories[0].score)) * 100))
-            const p = <ConfidenceScore text={confidenceScore} /> 
-            // Need to figure out how to render this in the view. 
-            createPortal(p, document.body)
-        }
-      }
 
     return (
         <div id="live-view-container" ref={liveView}>
             {stream &&
                 <StyledVideo ref={videoRef} autoPlay />
             }
-            <button onClick={() => console.log('Detecting Faces...')}> Detect Faces </button>
+            <div>
+                <audio controls ref={audioRef}>
+                    <source src={"file:///Users/kalebheinzen/Documents/Projects/cephable/facial-movement-electronforge/public/soundMouthOpen.mp3"} type="audio/mpeg" />
+                </audio>
+            </div>
         </div>
     )
 }
